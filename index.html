@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emma - English Practice Chatbot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- เพิ่ม Library สำหรับทำพลุกระดาษ (Confetti) -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- เพิ่ม Library สำหรับแปลง HTML เป็นรูปภาพ (Save Report) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans Thai', sans-serif;
+            background-color: #f8fafc; /* bg-slate-50 */
+            color: #0f172a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        
+        /* Hide scrollbar for category tabs */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+
+        /* Custom scrollbar for chat area */
+        .chat-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .chat-scroll::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        .typing-dot {
+            animation: typing 1.4s infinite ease-in-out both;
+        }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 p-0 md:p-4 w-full h-full text-slate-800">
+
+    <div class="bg-white w-full h-[100dvh] md:h-[800px] md:max-w-[400px] flex flex-col md:rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-slate-200 overflow-hidden relative mx-auto">
+        
+        <!-- Dynamic Background Image -->
+        <div id="dynamicBg" class="absolute inset-0 bg-cover bg-center transition-all duration-1000 ease-in-out opacity-80 z-0"></div>
+        <!-- Gradient Overlay เพื่อให้อ่านข้อความแชทได้ง่ายขึ้น -->
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-50/95 via-slate-50/50 to-slate-50/30 pointer-events-none z-0"></div>
+
+        <!-- Header -->
+        <div class="flex flex-col p-4 pt-6 md:pt-4 border-b border-slate-200/80 gap-3 bg-white/70 backdrop-blur-xl z-10 relative">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 border border-blue-200 shrink-0 shadow-sm">
+                        <i class="ph-fill ph-chat-centered-text text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-slate-800 font-bold text-lg leading-tight">Emma</h1>
+                        <p class="text-slate-500 text-xs font-medium">chatbot ฝึกพูดภาษาอังกฤษ</p>
+                    </div>
+                </div>
+                <!-- Gamification Score & End Chat Button -->
+                <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" id="endChatBtn" class="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-full border border-slate-200 transition-colors text-xs font-bold shadow-sm" title="สรุปผลการสนทนา">
+                        <i class="ph-fill ph-flag-checkered text-sm text-slate-400"></i> <span class="hidden sm:inline">สรุปผล</span>
+                    </button>
+                    <div class="flex items-center gap-1.5 bg-yellow-50 text-yellow-600 px-3 py-1.5 rounded-full border border-yellow-200 transition-all duration-300 shrink-0 shadow-sm" id="scoreBadge">
+                        <i class="ph-fill ph-coin text-lg"></i>
+                        <span id="scoreDisplay" class="font-bold text-sm">0</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Level & EXP Bar -->
+            <div class="w-full bg-white/50 rounded-xl p-2.5 border border-slate-200 shadow-sm">
+                <div class="flex justify-between items-center mb-1.5 px-1">
+                    <span class="text-xs font-bold text-blue-600 transition-transform duration-300 inline-block" id="levelDisplay">Level 1</span>
+                    <span class="text-[10px] text-slate-500 font-medium" id="expDisplay">0 / 100 EXP</span>
+                </div>
+                <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden shadow-inner">
+                    <div class="bg-gradient-to-r from-blue-400 to-indigo-500 h-full rounded-full transition-all duration-500 w-0" id="expBar"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Categories -->
+        <div class="px-4 py-3 flex gap-2 overflow-x-auto no-scrollbar shrink-0 border-b border-slate-200/80 bg-white/70 backdrop-blur-xl z-10 relative" id="categoriesContainer">
+            <!-- Rendered via JS -->
+        </div>
+
+        <!-- Chat Area -->
+        <div class="flex-1 overflow-y-auto p-4 space-y-4 chat-scroll flex flex-col bg-transparent z-10 relative" id="chatArea">
+            <!-- Messages will be injected here -->
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-4 border-t border-slate-200/80 bg-white/80 backdrop-blur-xl z-10 relative shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+            <form id="chatForm" class="flex gap-2 relative">
+                <!-- ปุ่มไมค์ (Speech-to-Text) -->
+                <button type="button" id="micBtn" class="bg-white hover:bg-slate-50 text-slate-500 w-12 rounded-xl flex items-center justify-center border border-slate-200 transition-colors shrink-0 shadow-sm" title="กดเพื่อพูด">
+                    <i class="ph ph-microphone text-xl pointer-events-none"></i>
+                </button>
+
+                <input type="text" id="userInput" 
+                    class="w-full bg-white text-slate-800 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all placeholder:text-slate-400 text-sm shadow-sm"
+                    placeholder="Type or speak in English..." autocomplete="off">
+                
+                <button type="submit" id="sendBtn"
+                    class="bg-blue-600 hover:bg-blue-700 text-white w-12 rounded-xl flex items-center justify-center border border-blue-700 transition-colors disabled:opacity-50 shrink-0 shadow-sm">
+                    <i class="ph-fill ph-paper-plane-right text-xl"></i>
+                </button>
+            </form>
+            <p class="text-[10px] text-slate-500 text-center mt-2 font-medium" id="statusText">ไม่ต้องกลัวพิมพ์ผิด Emma จะช่วยแนะนำอย่างเป็นมิตร 😊</p>
+        </div>
+    </div>
+
+    <!-- Report Card Modal -->
+    <div id="reportModal" class="fixed inset-0 bg-slate-900/40 z-50 hidden flex-col items-center justify-center p-4 backdrop-blur-sm">
+        <!-- Content to capture as image -->
+        <div id="reportCardElement" class="bg-white border border-slate-200 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 text-center relative shrink-0">
+                <h2 class="text-2xl font-bold text-white mb-1">Session Report Card</h2>
+                <p class="text-blue-100 text-sm font-medium">ผลการฝึกฝนภาษาอังกฤษกับ Emma</p>
+                <div class="absolute top-4 right-4 bg-white/20 px-3 py-1 rounded-full text-white font-bold text-xs backdrop-blur-md border border-white/30 shadow-sm">
+                    Level <span id="reportLevel"></span>
+                </div>
+            </div>
+            <!-- Body -->
+            <div class="p-5 overflow-y-auto space-y-4 chat-scroll bg-slate-50/50">
+                <!-- Strengths -->
+                <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl shadow-sm">
+                    <h3 class="text-emerald-700 font-bold text-sm mb-2 flex items-center gap-2"><i class="ph-fill ph-star"></i> สิ่งที่ทำได้ดี</h3>
+                    <p id="reportStrengths" class="text-slate-700 text-xs leading-relaxed"></p>
+                </div>
+                <!-- Weaknesses -->
+                <div class="bg-rose-50 border border-rose-200 p-4 rounded-2xl shadow-sm">
+                    <h3 class="text-rose-700 font-bold text-sm mb-2 flex items-center gap-2"><i class="ph-fill ph-warning-circle"></i> จุดที่ควรพัฒนา</h3>
+                    <p id="reportWeaknesses" class="text-slate-700 text-xs leading-relaxed"></p>
+                </div>
+                <!-- Vocabulary -->
+                <div class="bg-blue-50 border border-blue-200 p-4 rounded-2xl shadow-sm">
+                    <h3 class="text-blue-700 font-bold text-sm mb-2 flex items-center gap-2"><i class="ph-fill ph-book-bookmark"></i> คำศัพท์ที่ได้เรียนรู้</h3>
+                    <ul id="reportVocabulary" class="list-disc list-inside text-slate-700 text-xs space-y-1 font-medium"></ul>
+                </div>
+                <!-- Encouragement -->
+                <div class="text-center italic text-slate-500 text-xs mt-3 font-semibold" id="reportEncouragement"></div>
+            </div>
+        </div>
+        
+        <!-- Footer Buttons (Outside the capture area) -->
+        <div class="w-full max-w-md flex gap-3 mt-4 shrink-0">
+            <button id="closeReportBtn" class="flex-1 py-3 rounded-xl font-bold text-slate-600 bg-white hover:bg-slate-50 transition-colors text-sm border border-slate-200 shadow-sm">กลับไปแชทต่อ</button>
+            <button id="saveReportBtn" class="flex-1 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-600/30">
+                <i class="ph ph-download-simple text-lg"></i> บันทึกรูปภาพ
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Data & State
+        const scenarios = [
+            { id: 'food', icon: 'hamburger', label: 'สั่งอาหาร', bgImage: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80', firstMessage: "Welcome to my restaurant! What would you like to order today? 🍔\n🇹🇭 ยินดีต้อนรับสู่ร้านอาหารของเรา! วันนี้คุณต้องการสั่งอะไรดีคะ? (ไม่ต้องกลัวผิด พิมพ์ตอบสั้นๆ ได้เลยครับ)" },
+            { id: 'directions', icon: 'map-pin', label: 'ถามทาง', bgImage: 'https://images.unsplash.com/photo-1449844908441-8829872d2607?auto=format&fit=crop&w=800&q=80', firstMessage: "Excuse me, I'm a bit lost. Can you tell me how to get to the nearest train station? 🗺️\n🇹🇭 ขอโทษนะคะ ฉันหลงทางนิดหน่อย คุณพอจะบอกทางไปสถานีรถไฟที่ใกล้ที่สุดให้หน่อยได้ไหมคะ?" },
+            { id: 'interview', icon: 'briefcase', label: 'สัมภาษณ์งาน', bgImage: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80', firstMessage: "Hello, thanks for coming in today. Could you start by telling me a little bit about yourself? 💼\n🇹🇭 สวัสดีครับ ขอบคุณที่มาในวันนี้ คุณช่วยเริ่มต้นด้วยการแนะนำตัวเองสั้นๆ ให้ฟังหน่อยได้ไหมครับ?" },
+            { id: 'general', icon: 'chat-teardrop', label: 'พูดคุยทั่วไป', bgImage: 'https://images.unsplash.com/photo-1516280440502-3c2c1a8523c0?auto=format&fit=crop&w=800&q=80', firstMessage: "Let's just chat! Tell me about your day, in English.\nNo pressure — any sentence is a good start. ✨\n🇹🇭 มาคุยกันเถอะ! เล่าเรื่องราวในวันนี้ของคุณให้ฟังหน่อย เป็นภาษาอังกฤษนะ\nไม่ต้องกดดันครับ — เริ่มด้วยประโยคไหนก็เยี่ยมแล้ว ✨" }
+        ];
+
+        let activeScenario = 'general';
+        let chatHistory = [];
+        let score = 0;
+        let exp = 0;
+        let level = 1;
+        let expToNextLevel = 100;
+        
+        // Gemini API Config
+        const apiKey = ""; // API key จะถูกจัดการโดยระบบอัตโนมัติ
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+        
+        // System Prompt ที่ปรับให้ใช้ JSON เพื่อความเสถียร
+        const systemPrompt = `You are 'Emma', a friendly English practice tutor for Thai students. Your goal is to help them overcome the fear of speaking/writing English. 
+        Rules:
+        1. Be extremely encouraging, friendly, and non-judgmental.
+        2. Use simple English (A1-B2 level).
+        3. If the user replies in English, translate their message into Thai. If they reply in Thai, translate it into English (so they learn how to say it).
+        4. Evaluate the user's input: If it is perfect or highly accurate, award 20 points. If understandable but contains mistakes, award 10 points.
+        5. ALWAYS format your response in pure JSON (no markdown fences).
+
+        JSON Format:
+        {
+          "userTranslation": "Thai translation of user's English msg OR English translation of user's Thai msg",
+          "grammarFeedback": "Grammar/vocabulary feedback in Thai. Praise if perfect!",
+          "englishReply": "Your English reply to continue the conversation",
+          "thaiTranslation": "Thai translation of your englishReply",
+          "earnedPoints": 10 or 20
+        }`;
+
+        // DOM Elements
+        const categoriesContainer = document.getElementById('categoriesContainer');
+        const chatArea = document.getElementById('chatArea');
+        const chatForm = document.getElementById('chatForm');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const scoreBadge = document.getElementById('scoreBadge');
+        const levelDisplay = document.getElementById('levelDisplay');
+        const expDisplay = document.getElementById('expDisplay');
+        const expBar = document.getElementById('expBar');
+        const micBtn = document.getElementById('micBtn');
+        const statusText = document.getElementById('statusText');
+        
+        // Report Modal DOM
+        const endChatBtn = document.getElementById('endChatBtn');
+        const reportModal = document.getElementById('reportModal');
+        const closeReportBtn = document.getElementById('closeReportBtn');
+        const saveReportBtn = document.getElementById('saveReportBtn');
+
+        // Text-to-Speech (TTS)
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                // ยกเลิกเสียงเก่าถ้ามี
+                window.speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US'; 
+                utterance.rate = 0.9; // ปรับให้พูดช้าลงนิดนึงเพื่อให้ผู้เรียนฟังง่ายขึ้น
+                window.speechSynthesis.speak(utterance);
+            } else {
+                console.warn("Your browser does not support Text-to-Speech.");
+            }
+        }
+
+        // Speech-to-Text (STT)
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'en-US'; // เน้นรับเสียงภาษาอังกฤษ
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                userInput.value = transcript;
+                resetMicButton();
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Speech recognition error", event.error);
+                resetMicButton();
+                statusText.textContent = "ไม่ได้ยินเสียง หรือไมโครโฟนมีปัญหาครับ 🎙️";
+                setTimeout(() => statusText.textContent = "ไม่ต้องกลัวพิมพ์ผิด Emma จะช่วยแนะนำอย่างเป็นมิตร 😊", 3000);
+            };
+
+            recognition.onend = () => {
+                resetMicButton();
+            };
+        }
+
+        function resetMicButton() {
+            micBtn.classList.remove('text-red-500', 'bg-red-50', 'border-red-200', 'animate-pulse');
+            micBtn.classList.add('text-slate-500', 'bg-white', 'border-slate-200');
+        }
+
+        micBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (recognition) {
+                // ถ้ามีเสียงอ่านอยู่ให้หยุดก่อน
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                }
+                
+                micBtn.classList.remove('text-slate-500', 'bg-white', 'border-slate-200');
+                micBtn.classList.add('text-red-500', 'bg-red-50', 'border-red-200', 'animate-pulse');
+                userInput.placeholder = "Listening...";
+                statusText.textContent = "กำลังฟังอยู่... พูดได้เลยครับ 👂";
+                recognition.start();
+            } else {
+                statusText.textContent = "เบราว์เซอร์นี้ไม่รองรับระบบสั่งการด้วยเสียงครับ 😢";
+                setTimeout(() => statusText.textContent = "ไม่ต้องกลัวพิมพ์ผิด Emma จะช่วยแนะนำอย่างเป็นมิตร 😊", 3000);
+            }
+        });
+
+        // หมวดหมู่ (Drag to Scroll)
+        let isDown = false;
+        let startX;
+        let scrollLeft;
+
+        categoriesContainer.addEventListener('mousedown', (e) => {
+            isDown = true;
+            categoriesContainer.style.cursor = 'grabbing';
+            startX = e.pageX - categoriesContainer.offsetLeft;
+            scrollLeft = categoriesContainer.scrollLeft;
+        });
+        categoriesContainer.addEventListener('mouseleave', () => {
+            isDown = false;
+            categoriesContainer.style.cursor = 'auto';
+        });
+        categoriesContainer.addEventListener('mouseup', () => {
+            isDown = false;
+            categoriesContainer.style.cursor = 'auto';
+        });
+        categoriesContainer.addEventListener('mousemove', (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - categoriesContainer.offsetLeft;
+            const walk = (x - startX) * 2;
+            categoriesContainer.scrollLeft = scrollLeft - walk;
+        });
+
+        // Initialize Function
+        function init() {
+            renderCategories();
+            startScenario(activeScenario);
+        }
+
+        function renderCategories() {
+            categoriesContainer.innerHTML = '';
+            scenarios.forEach(sc => {
+                const isActive = sc.id === activeScenario;
+                const btn = document.createElement('button');
+                btn.className = `shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm whitespace-nowrap transition-all border shadow-sm ${
+                    isActive 
+                    ? 'bg-blue-50 text-blue-700 border-blue-200 font-bold' 
+                    : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 font-medium'
+                }`;
+                btn.innerHTML = `<i class="ph ph-${sc.icon}"></i> ${sc.label}`;
+                btn.onclick = () => {
+                    if(activeScenario !== sc.id) {
+                        activeScenario = sc.id;
+                        renderCategories();
+                        startScenario(sc.id);
+                    }
+                };
+                categoriesContainer.appendChild(btn);
+            });
+        }
+
+        function startScenario(id) {
+            const scenario = scenarios.find(s => s.id === id);
+            chatHistory = []; 
+            chatArea.innerHTML = ''; 
+            
+            // อัปเดตภาพพื้นหลังพร้อมแอนิเมชัน Fade-in
+            const dynamicBg = document.getElementById('dynamicBg');
+            if(dynamicBg) {
+                dynamicBg.style.opacity = '0';
+                setTimeout(() => {
+                    dynamicBg.style.backgroundImage = `url('${scenario.bgImage}')`;
+                    dynamicBg.style.opacity = '0.8'; // ปรับให้เห็นรูปภาพพื้นหลังชัดเจนขึ้น
+                }, 300); // ดีเลย์นิดนึงให้ภาพโหลดเพื่อความนุ่มนวล
+            }
+            
+            const initialMsg = {
+                englishReply: scenario.firstMessage.split('\n🇹🇭')[0],
+                thaiTranslation: scenario.firstMessage.split('\n🇹🇭')[1] || ""
+            };
+            
+            addBotMessage(initialMsg, false);
+            chatHistory.push({ role: "model", parts: [{ text: initialMsg.englishReply }] });
+        }
+
+        function scrollToBottom() {
+            chatArea.scrollTo({
+                top: chatArea.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+
+        function addBotMessage(textObj, isTyping = false) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'flex w-full mb-4 justify-start';
+            
+            let contentHTML = '';
+            if (isTyping) {
+                contentHTML = `
+                    <div class="flex gap-1 items-center h-5">
+                        <div class="w-1.5 h-1.5 bg-slate-300 rounded-full typing-dot"></div>
+                        <div class="w-1.5 h-1.5 bg-slate-300 rounded-full typing-dot"></div>
+                        <div class="w-1.5 h-1.5 bg-slate-300 rounded-full typing-dot"></div>
+                    </div>
+                `;
+                msgDiv.id = 'typingIndicator';
+            } else if (typeof textObj === 'object' && textObj !== null) {
+                // UI สำหรับ JSON Format
+                if (textObj.userTranslation) {
+                    contentHTML += `<div class="text-slate-600 text-[13px] mb-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 shadow-sm"><span class="font-bold text-slate-700">📝 คำแปล:</span><br>${textObj.userTranslation.replace(/\n/g, '<br>')}</div>`;
+                }
+                if (textObj.grammarFeedback) {
+                    contentHTML += `<div class="text-slate-700 text-[13px] mb-3 bg-blue-50/80 p-2.5 rounded-lg border border-blue-200 shadow-sm"><span class="font-bold text-blue-700">💡 คำแนะนำ:</span><br>${textObj.grammarFeedback.replace(/\n/g, '<br>')}</div>`;
+                }
+                if (textObj.englishReply) {
+                    const rawText = textObj.englishReply;
+                    const escapedText = rawText.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    contentHTML += `
+                        <div class="text-slate-800 text-sm mb-2 mt-1 flex justify-between items-start gap-2 font-medium">
+                            <div>${rawText.replace(/\n/g, '<br>')}</div>
+                            <button onclick="speakText(this.getAttribute('data-text'))" data-text="${escapedText}" class="shrink-0 text-slate-400 hover:text-blue-600 bg-slate-100 hover:bg-slate-200 p-1.5 rounded-lg transition-colors border border-slate-200 shadow-sm" title="ฟังเสียง">
+                                <i class="ph-fill ph-speaker-high text-lg pointer-events-none"></i>
+                            </button>
+                        </div>
+                    `;
+                }
+                if (textObj.thaiTranslation) {
+                    contentHTML += `<div class="text-slate-500 text-xs pt-2 border-t border-slate-100 mt-2 font-medium">🇹🇭 ${textObj.thaiTranslation.replace(/\n/g, '<br>')}</div>`;
+                }
+            } else {
+                // Fallback (กรณีที่ textObj เป็น string ธรรมดา)
+                contentHTML = String(textObj).replace(/\n/g, '<br>');
+            }
+
+            msgDiv.innerHTML = `
+                <div class="bg-white px-4 py-3 rounded-2xl rounded-tl-sm max-w-[85%] text-sm leading-relaxed border border-slate-200 shadow-sm">
+                    ${contentHTML}
+                </div>
+            `;
+            chatArea.appendChild(msgDiv);
+            scrollToBottom();
+        }
+
+        function addUserMessage(text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'flex w-full mb-4 justify-end';
+            msgDiv.innerHTML = `
+                <div class="bg-blue-600 text-white px-4 py-3 rounded-2xl rounded-tr-sm max-w-[85%] text-sm leading-relaxed shadow-md font-medium">
+                    ${text}
+                </div>
+            `;
+            chatArea.appendChild(msgDiv);
+            scrollToBottom();
+        }
+
+        function removeTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) indicator.remove();
+        }
+
+        function updateScore(points) {
+            score += points;
+            scoreDisplay.textContent = score;
+            
+            // Animation เหรียญทอง
+            scoreBadge.classList.add('scale-110', 'bg-yellow-100', 'border-yellow-400');
+            setTimeout(() => {
+                scoreBadge.classList.remove('scale-110', 'bg-yellow-100', 'border-yellow-400');
+            }, 300);
+            
+            // ระบบ Level & EXP
+            exp += points;
+            if (exp >= expToNextLevel) {
+                level++;
+                exp -= expToNextLevel;
+                expToNextLevel = Math.floor(expToNextLevel * 1.5); // หลอดถัดไปใช้ EXP เพิ่มขึ้น 50%
+                levelDisplay.textContent = `Level ${level}`;
+                
+                // Animation อัปเลเวล
+                levelDisplay.classList.add('text-yellow-400', 'scale-125');
+                setTimeout(() => levelDisplay.classList.remove('text-yellow-400', 'scale-125'), 500);
+            }
+            
+            // อัปเดตแถบ EXP
+            expDisplay.textContent = `${exp} / ${expToNextLevel} EXP`;
+            expBar.style.width = `${(exp / expToNextLevel) * 100}%`;
+        }
+
+        async function fetchAIResponse(userText) {
+            chatHistory.push({ role: "user", parts: [{ text: userText }] });
+
+            const payload = {
+                contents: chatHistory,
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+                generationConfig: {
+                    responseMimeType: "application/json"
+                }
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates.length > 0) {
+                    const rawReply = result.candidates[0].content.parts[0].text;
+                    let parsedReply;
+                    try {
+                        parsedReply = JSON.parse(rawReply);
+                    } catch(e) {
+                        parsedReply = { englishReply: rawReply, thaiTranslation: "ระบบขัดข้องในการแปลรูปแบบข้อมูล" };
+                    }
+                    
+                    // ป้อนเฉพาะข้อความภาษาอังกฤษกลับไปใน History ให้ AI จดจำ
+                    chatHistory.push({ role: "model", parts: [{ text: parsedReply.englishReply || rawReply }] });
+                    
+                    removeTypingIndicator();
+                    addBotMessage(parsedReply);
+                    
+                    // ระบบให้คะแนนโดย AI
+                    let points = parsedReply.earnedPoints ? parseInt(parsedReply.earnedPoints) : 10;
+                    if (isNaN(points)) points = 10;
+                    
+                    updateScore(points);
+                    
+                    // จุดพลุฉลองถ้าตอบถูกและได้ 20 คะแนน 
+                    if (points >= 20 && typeof confetti === 'function') {
+                        confetti({
+                            particleCount: 100,
+                            spread: 70,
+                            origin: { y: 0.6 },
+                            zIndex: 9999,
+                            colors: ['#3b82f6', '#8b5cf6', '#eab308', '#ec4899']
+                        });
+                    }
+                    
+                } else {
+                    throw new Error("Invalid response structure");
+                }
+            } catch (error) {
+                console.error("API Error:", error);
+                removeTypingIndicator();
+                addBotMessage({ 
+                    englishReply: "Oops! My connection dropped for a second. Can you say that again?", 
+                    thaiTranslation: "ระบบขัดข้องชั่วคราว ลองพิมพ์ใหม่อีกครั้งนะครับ 🔌"
+                });
+                chatHistory.pop(); 
+            }
+        }
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            userInput.value = '';
+            userInput.placeholder = "Type or speak in English...";
+            userInput.disabled = true;
+            sendBtn.disabled = true;
+            micBtn.disabled = true;
+            statusText.textContent = "กำลังพิมพ์ตอบกลับ...";
+            
+            // เปลี่ยนไอคอนปุ่มส่งเป็น Spinner (Loading State)
+            sendBtn.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i>';
+            
+            addUserMessage(text);
+            addBotMessage('', true); // โชว์ Typing Indicator
+
+            await fetchAIResponse(text);
+
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            micBtn.disabled = false;
+            statusText.textContent = "ไม่ต้องกลัวพิมพ์ผิด Emma จะช่วยแนะนำอย่างเป็นมิตร 😊";
+            
+            // คืนค่าไอคอนกลับเป็นเครื่องบินกระดาษ
+            sendBtn.innerHTML = '<i class="ph ph-paper-plane-right text-xl"></i>';
+            
+            userInput.focus();
+        });
+
+        // --- Session Summary Logic ---
+        const summarySystemPrompt = `You are 'Emma', an English teacher evaluating a student's chat session.
+        Analyze the conversation history provided and create a summary report in JSON format.
+        Focus on Thai language explanations so the Thai student understands easily.
+
+        JSON Format:
+        {
+          "strengths": "Explain what the student did well (in Thai).",
+          "weaknesses": "Point out frequent grammar/spelling mistakes and how to fix them (in Thai). If none, praise them.",
+          "vocabulary": ["Word/Phrase 1: Meaning in Thai", "Word/Phrase 2: Meaning in Thai"],
+          "encouragement": "A short encouraging closing message in English."
+        }`;
+
+        endChatBtn.addEventListener('click', async () => {
+            // เช็คว่ามีการโต้ตอบกันหรือยัง (มีข้อความมากกว่า 1 อันใน History)
+            if (chatHistory.length <= 1) {
+                const originalHtml = endChatBtn.innerHTML;
+                endChatBtn.innerHTML = '<span class="text-[10px]">พิมพ์คุยก่อนนะ!</span>';
+                setTimeout(() => endChatBtn.innerHTML = originalHtml, 2000);
+                return;
+            }
+
+            const originalText = endChatBtn.innerHTML;
+            endChatBtn.innerHTML = '<i class="ph ph-spinner animate-spin"></i>';
+            endChatBtn.disabled = true;
+
+            try {
+                const payload = {
+                    contents: chatHistory,
+                    systemInstruction: { parts: [{ text: summarySystemPrompt }] },
+                    generationConfig: { responseMimeType: "application/json" }
+                };
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates.length > 0) {
+                    const rawReply = result.candidates[0].content.parts[0].text;
+                    const report = JSON.parse(rawReply);
+
+                    // ยัดข้อมูลลง UI
+                    document.getElementById('reportLevel').textContent = level;
+                    document.getElementById('reportStrengths').innerHTML = (report.strengths || "-").replace(/\n/g, '<br>');
+                    document.getElementById('reportWeaknesses').innerHTML = (report.weaknesses || "-").replace(/\n/g, '<br>');
+                    
+                    const vocabList = document.getElementById('reportVocabulary');
+                    vocabList.innerHTML = '';
+                    if(report.vocabulary && Array.isArray(report.vocabulary) && report.vocabulary.length > 0) {
+                        report.vocabulary.forEach(v => {
+                            const li = document.createElement('li');
+                            li.textContent = v;
+                            vocabList.appendChild(li);
+                        });
+                    } else {
+                        vocabList.innerHTML = '<li class="text-slate-400 italic text-xs">ไม่มีคำศัพท์ใหม่ในเซสชันนี้</li>';
+                    }
+
+                    document.getElementById('reportEncouragement').textContent = `"${report.encouragement || "Keep going!"}"`;
+
+                    // แสดง Modal
+                    reportModal.classList.remove('hidden');
+                    reportModal.classList.add('flex');
+
+                    // จุดพลุฉลองที่เรียนจบเซสชัน
+                    if (typeof confetti === 'function') {
+                        confetti({ particleCount: 150, spread: 80, origin: { y: 0.3 }, zIndex: 99999 });
+                    }
+                }
+            } catch (error) {
+                console.error("Summary API Error:", error);
+                statusText.textContent = "เกิดข้อผิดพลาดในการสรุปผลครับ 😢";
+                setTimeout(() => statusText.textContent = "ไม่ต้องกลัวพิมพ์ผิด Emma จะช่วยแนะนำอย่างเป็นมิตร 😊", 3000);
+            } finally {
+                endChatBtn.innerHTML = originalText;
+                endChatBtn.disabled = false;
+            }
+        });
+
+        closeReportBtn.addEventListener('click', () => {
+            reportModal.classList.add('hidden');
+            reportModal.classList.remove('flex');
+        });
+
+        // บันทึก Report Card เป็นรูปภาพ
+        saveReportBtn.addEventListener('click', async () => {
+            if (typeof html2canvas === 'undefined') return;
+            
+            const originalHtml = saveReportBtn.innerHTML;
+            saveReportBtn.innerHTML = '<i class="ph ph-spinner animate-spin text-lg"></i> กำลังบันทึก...';
+            saveReportBtn.disabled = true;
+            
+            try {
+                const reportCard = document.getElementById('reportCardElement');
+                const canvas = await html2canvas(reportCard, {
+                    backgroundColor: '#ffffff', // เปลี่ยนเป็นสีขาวให้เข้ากับธีม
+                    scale: 2, // เพิ่มความละเอียดภาพ x2
+                    logging: false
+                });
+                
+                const link = document.createElement('a');
+                link.download = `Emma-Report-Lv${level}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                
+                saveReportBtn.innerHTML = '<i class="ph ph-check text-lg"></i> บันทึกสำเร็จ!';
+                setTimeout(() => {
+                    saveReportBtn.innerHTML = originalHtml;
+                    saveReportBtn.disabled = false;
+                }, 2000);
+                
+            } catch (error) {
+                console.error("Save Report Error:", error);
+                saveReportBtn.innerHTML = originalHtml;
+                saveReportBtn.disabled = false;
+            }
+        });
+
+        // Initialize App on load
+        window.onload = init;
+
+    </script>
+</body>
+</html>
